@@ -7,14 +7,15 @@ sans effectuer de vraies requêtes réseau (mocks).
 
 import sys
 import os
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 
-# Ajouter le dossier App au path pour importer le module GUI
+# Ajouter le dossier App au path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "App"))
 
-# On importe uniquement fetch_skins_db depuis le GUI
-from csfloat_gui import fetch_skins_db, SKINS_API
+from api import fetch_skins_db
+from config import SKINS_API
 
 
 # ── Données fictives représentant la structure réelle de l'API ─────────────────
@@ -64,6 +65,17 @@ FAKE_SKINS = [
 class TestFetchSkinsDb(unittest.TestCase):
     """Tests de la récupération de la base de skins."""
 
+    def setUp(self):
+        import api as _api
+        self._orig_cache = _api.SKINS_CACHE_PATH
+        _api.SKINS_CACHE_PATH = tempfile.mktemp(suffix=".json")
+
+    def tearDown(self):
+        import api as _api
+        if os.path.exists(_api.SKINS_CACHE_PATH):
+            os.remove(_api.SKINS_CACHE_PATH)
+        _api.SKINS_CACHE_PATH = self._orig_cache
+
     def _make_mock_response(self, json_data, status_code=200):
         mock_resp = MagicMock()
         mock_resp.status_code = status_code
@@ -71,7 +83,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         mock_resp.raise_for_status = MagicMock()
         return mock_resp
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_retourne_liste_de_skins(self, mock_get):
         """fetch_skins_db doit retourner la liste complète des skins."""
         mock_get.return_value = self._make_mock_response(FAKE_SKINS)
@@ -81,7 +93,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 3)
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_appel_url_correcte(self, mock_get):
         """L'URL de l'API skins doit être celle définie dans la config."""
         mock_get.return_value = self._make_mock_response(FAKE_SKINS)
@@ -91,7 +103,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         args, kwargs = mock_get.call_args
         self.assertEqual(args[0], SKINS_API)
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_timeout_present(self, mock_get):
         """Un timeout doit être défini pour l'appel réseau."""
         mock_get.return_value = self._make_mock_response(FAKE_SKINS)
@@ -102,7 +114,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         self.assertIn("timeout", kwargs)
         self.assertGreater(kwargs["timeout"], 0)
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_structure_skin(self, mock_get):
         """Chaque skin doit contenir les champs attendus."""
         mock_get.return_value = self._make_mock_response(FAKE_SKINS)
@@ -114,7 +126,7 @@ class TestFetchSkinsDb(unittest.TestCase):
             self.assertIn("weapon", skin)
             self.assertIn("image", skin)
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_skin_champs_arme(self, mock_get):
         """Le champ 'weapon' doit contenir id et name."""
         mock_get.return_value = self._make_mock_response(FAKE_SKINS)
@@ -125,7 +137,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         self.assertEqual(ak47["weapon"]["name"], "AK-47")
         self.assertIn("id", ak47["weapon"])
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_erreur_http_propagee(self, mock_get):
         """Une erreur HTTP doit être propagée."""
         mock_resp = self._make_mock_response({}, status_code=503)
@@ -135,7 +147,7 @@ class TestFetchSkinsDb(unittest.TestCase):
         with self.assertRaises(Exception):
             fetch_skins_db()
 
-    @patch("csfloat_gui.requests.get")
+    @patch("api.requests.get")
     def test_liste_vide(self, mock_get):
         """Une réponse vide est gérée sans erreur."""
         mock_get.return_value = self._make_mock_response([])
