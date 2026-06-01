@@ -22,7 +22,7 @@ class PriceViewMixin:
         full_name = skin.get("name", "")
         parts     = full_name.split(" | ")
         skin_name = parts[1] if len(parts) > 1 else full_name
-        self._update_breadcrumb(weapon=self.sel_weapon, skin_name=skin_name)
+        self._update_breadcrumb(section=self.sel_section, weapon=self.sel_weapon, skin_name=skin_name)
 
         min_f = skin.get("min_float", 0.0)
         max_f = skin.get("max_float", 1.0)
@@ -109,12 +109,21 @@ class PriceViewMixin:
         if not key:
             messagebox.showerror("Cle manquante", "Valide ta cle API d'abord.")
             return
-        name = f"{self.sel_skin.get('name', '')} ({wear})"
+        base_name = self.sel_skin.get("name", "")
+        cat_label = self.cat_var.get()
+        cat = CATEGORY_MAP[cat_label]
+        # Le market_hash_name doit inclure le préfixe StatTrak™ / Souvenir
+        if cat == 2 and not base_name.startswith("StatTrak\u2122"):
+            prefixed = f"StatTrak\u2122 {base_name}"
+        elif cat == 3 and not base_name.startswith("Souvenir"):
+            prefixed = f"Souvenir {base_name}"
+        else:
+            prefixed = base_name
+        market_name = f"{prefixed} ({wear})"
         min_f, max_f = FLOAT_RANGES[wear]
-        cat = CATEGORY_MAP[self.cat_var.get()]
-        self._show_loading_results(name)
+        self._show_loading_results(market_name)
         threading.Thread(target=self._fetch_price_thread,
-                         args=(key, name, min_f, max_f, cat), daemon=True).start()
+                         args=(key, market_name, min_f, max_f, cat), daemon=True).start()
 
     def _fetch_price_thread(self, key, name, min_f, max_f, cat):
         try:
@@ -124,9 +133,15 @@ class PriceViewMixin:
             self.stats_cache    = stats
             self.after(0, self._show_price_results, name, listings, stats)
         except requests.HTTPError as e:
-            code = e.response.status_code
-            msg  = "Cle API invalide." if code == 401 else \
-                   "Rate limit atteint." if code == 429 else f"HTTP {code}"
+            code = e.response.status_code if e.response is not None else 0
+            if code == 401:
+                msg = "Cl\u00e9 API invalide — v\u00e9rifie ta cl\u00e9."
+            elif code == 429:
+                msg = "Rate limit atteint — attends quelques secondes."
+            elif code == 403:
+                msg = "403 — Cl\u00e9 invalide ou expir\u00e9e.\nReg\u00e9n\u00e8re ta cl\u00e9 sur\ncsfloat.com/profile > Developer"
+            else:
+                msg = str(e) if str(e) else f"HTTP {code}"
             self.after(0, self._show_error_results, msg)
         except Exception as e:
             self.after(0, self._show_error_results, str(e))

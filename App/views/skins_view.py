@@ -1,13 +1,14 @@
 """Mixin - Ecran 2 : grille de selection des skins."""
 import tkinter as tk
 
+from api import get_img_path_by_name
 from config import ACCENT, BG, BG3, BORDER, FONT_BODY, FONT_HEAD, MUTED, TEXT
 from widgets import ScrollFrame, SkinCard
 
 
 class SkinsViewMixin:
     def _show_skins(self):
-        self._update_breadcrumb(weapon=self.sel_weapon)
+        self._update_breadcrumb(section=self.sel_section, weapon=self.sel_weapon)
         sf = ScrollFrame(self.main_area)
         self._swap(sf)
         tk.Label(sf.inner, text=f"Skins - {self.sel_weapon}", font=FONT_HEAD,
@@ -34,8 +35,11 @@ class SkinsViewMixin:
         for i, skin in enumerate(skins):
             parts     = skin.get("name", "").split(" | ")
             skin_name = parts[1] if len(parts) > 1 else skin.get("name", "")
+            img_path  = get_img_path_by_name(skin.get("name", ""))
+            img_url   = "" if img_path else skin.get("image", "")
             row, col  = divmod(i, 6)
-            SkinCard(self._skins_grid, name=skin_name, img_url=skin.get("image", ""),
+            SkinCard(self._skins_grid, name=skin_name,
+                     img_url=img_url, img_path=img_path or "",
                      callback=lambda s=skin: self._select_skin(s),
                      card_w=148, card_h=120, img_size=(115, 80)
                      ).grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
