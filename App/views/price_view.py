@@ -109,12 +109,21 @@ class PriceViewMixin:
         if not key:
             messagebox.showerror("Cle manquante", "Valide ta cle API d'abord.")
             return
-        name = f"{self.sel_skin.get('name', '')} ({wear})"
+        base_name = self.sel_skin.get("name", "")
+        cat_label = self.cat_var.get()
+        cat = CATEGORY_MAP[cat_label]
+        # Le market_hash_name doit inclure le préfixe StatTrak™ / Souvenir
+        if cat == 2 and not base_name.startswith("StatTrak\u2122"):
+            prefixed = f"StatTrak\u2122 {base_name}"
+        elif cat == 3 and not base_name.startswith("Souvenir"):
+            prefixed = f"Souvenir {base_name}"
+        else:
+            prefixed = base_name
+        market_name = f"{prefixed} ({wear})"
         min_f, max_f = FLOAT_RANGES[wear]
-        cat = CATEGORY_MAP[self.cat_var.get()]
-        self._show_loading_results(name)
+        self._show_loading_results(market_name)
         threading.Thread(target=self._fetch_price_thread,
-                         args=(key, name, min_f, max_f, cat), daemon=True).start()
+                         args=(key, market_name, min_f, max_f, cat), daemon=True).start()
 
     def _fetch_price_thread(self, key, name, min_f, max_f, cat):
         try:
