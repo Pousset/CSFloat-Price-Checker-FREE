@@ -6,7 +6,7 @@ from config import (
     ACCENT, BG, BG2, BG3, BORDER, CARD, CARD_H,
     FONT_BODY, FONT_HEAD, FONT_SMALL, MUTED, SECTION_ICONS, SECTION_ORDER, TEXT,
 )
-from widgets import CategoryCard, ScrollFrame, SkinCard
+from widgets import CategoryCard, ScrollFrame, SkinCard, grid_card_size
 
 
 class WeaponsViewMixin:
@@ -83,36 +83,64 @@ class WeaponsViewMixin:
         # Grille scrollable
         sf = ScrollFrame(outer)
         sf.pack(fill="both", expand=True)
-        self._weapons_grid = tk.Frame(sf.inner, bg=BG, padx=20)
-        self._weapons_grid.pack(fill="both", pady=10)
+        self._weapons_inner  = sf.inner
+        self._weapons_canvas = sf.canvas
+        self._last_section_w = 0
 
         self._current_weapons = weapons
-        self._weapon_search.trace_add("write", lambda *_: self._refresh_section_grid())
-        self._refresh_section_grid()
+        self._weapon_search.trace_add("write",
+                                      lambda *_: self._refresh_section_grid())
+        sf.canvas.bind("<Configure>",
+                       lambda e: self._on_weapons_canvas_resize(e.width))
+        sf.canvas.after_idle(
+            lambda: self._refresh_section_grid(self._weapons_canvas.winfo_width()))
 
     # ── Grille d'armes ────────────────────────────────────────────────────────
 
-    def _refresh_section_grid(self):
-        for w in self._weapons_grid.winfo_children():
-            w.destroy()
+    def _on_weapons_canvas_resize(self, width: int):
+        """Re-layout seulement si la largeur change de plus de 20 px."""
+        if abs(width - self._last_section_w) >= 20:
+            self._refresh_section_grid(width)
+
+    def _refresh_section_grid(self, avail_w: int = 0):
+        if avail_w == 0:
+            avail_w = self._weapons_canvas.winfo_width()
+        self._last_section_w = avail_w
+
+        for child in self._weapons_inner.winfo_children():
+            child.destroy()
+
         q = self._weapon_search.get().lower()
         weapons = ([w for w in self._current_weapons if q in w.lower()]
                    if q else self._current_weapons)
-        cols = 6
+
+        if not weapons:
+            tk.Label(self._weapons_inner, text="Aucune arme trouvée",
+                     font=FONT_BODY, bg=BG, fg=MUTED).pack(pady=20)
+            return
+
+        cols, card_w, card_h = grid_card_size(
+            len(weapons), avail_w, pad=10, min_w=120, max_w=240)
+        img_w = int(card_w * 0.78)
+        img_h = int(card_h * 0.62)
+
+        grid = tk.Frame(self._weapons_inner, bg=BG)
+        grid.pack(fill="x", padx=5, pady=5)
+
         for i, weapon in enumerate(weapons):
             skins    = self.weapons_map.get(weapon, [])
             img_path = get_img_path_by_name(skins[0].get("name", "")) if skins else ""
             img_url  = "" if img_path else (skins[0].get("image", "") if skins else "")
             row, col = divmod(i, cols)
             SkinCard(
-                self._weapons_grid, name=weapon,
+                grid, name=weapon,
                 img_url=img_url, img_path=img_path or "",
                 callback=lambda w=weapon: self._select_weapon(w),
-                card_w=148, card_h=120, img_size=(115, 80),
+                card_w=card_w, card_h=card_h, img_size=(img_w, img_h),
             ).grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
-        if not weapons:
-            tk.Label(self._weapons_grid, text="Aucune arme trouvée",
-                     font=FONT_BODY, bg=BG, fg=MUTED).pack(pady=20)
+
+        for c in range(cols):
+            grid.columnconfigure(c, weight=1)
 
     def _select_weapon(self, weapon: str):
         self.sel_weapon = weapon

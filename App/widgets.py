@@ -76,54 +76,119 @@ class ScrollFrame(tk.Frame):
                                  -1 * (e.delta // 120), "units"))
 
 
-class SkinCard(tk.Frame):
+def grid_card_size(n: int, avail_w: int, pad: int = 10,
+                   min_w: int = 130, max_w: int = 250) -> tuple[int, int, int]:
+    """Calcule (cols, card_w, card_h) adaptatif au nombre d'items et à la largeur."""
+    avail_w = max(avail_w, 300)
+    n = max(n, 1)
+    for cols in range(min(n, 10), 0, -1):
+        cw = (avail_w - pad * (cols + 1)) / cols
+        if cw >= min_w:
+            cw = min(int(cw), max_w)
+            return cols, cw, int(cw * 0.85)
+    cw = min(avail_w - pad * 2, max_w)
+    return 1, cw, int(cw * 0.85)
+
+
+class SkinCard(tk.Canvas):
+    """Card de skin avec coins arrondis (Canvas), taille adaptative."""
+
+    _RADIUS = 12
+
     def __init__(self, parent, name: str, img_url: str = "", img_path: str = "",
-                 callback=None, card_w=120, card_h=110, img_size=(90, 68), **kw):
-        super().__init__(parent, bg=CARD, width=card_w, height=card_h,
+                 callback=None, card_w=148, card_h=130, img_size=(115, 80), **kw):
+        try:
+            bg_p = parent.cget("bg")
+        except Exception:
+            bg_p = BG
+        super().__init__(parent, width=card_w, height=card_h,
+                         highlightthickness=0, bd=0, bg=bg_p,
                          cursor="hand2", **kw)
-        self.pack_propagate(False)
-        self._cb = callback
+        self._cw      = card_w
+        self._ch      = card_h
+        self._cb      = callback
+        self._name    = name
+        self._img_url = img_url
+        self._img_path = img_path
+        self._isize   = img_size
+        self._hovered = False
+        self._tk_img  = None
+        self._loading = False
 
-        self._img_lbl = tk.Label(self, bg=CARD, text="…", fg=MUTED, font=FONT_SMALL)
-        self._img_lbl.pack(expand=True)
+        self.bind("<Button-1>", lambda e: self._cb() if self._cb else None)
+        self.bind("<Enter>",    lambda e: self._on_hover(True))
+        self.bind("<Leave>",    lambda e: self._on_hover(False))
+        # Diffère le dessin jusqu'à ce que le widget existe dans Tcl/Tk
+        self.after_idle(self._draw)
 
-        label_text = name if len(name) <= 18 else name[:16] + "…"
-        self._name = tk.Label(self, text=label_text, bg=CARD, fg=TEXT,
-                              font=FONT_SMALL, wraplength=card_w - 8)
-        self._name.pack(pady=(0, 4))
+    # ── Dessin ────────────────────────────────────────────────────────────────
 
-        for w in (self, self._img_lbl, self._name):
-            w.bind("<Button-1>", lambda e: self._cb() if self._cb else None)
-            w.bind("<Enter>",    lambda e: self._hover(True))
-            w.bind("<Leave>",    lambda e: self._hover(False))
+    def _poly_round_rect(self, x1: int, y1: int, x2: int, y2: int, r: int, **kw):
+        pts = [x1 + r, y1,  x2 - r, y1,
+               x2,     y1,  x2,     y1 + r,
+               x2,     y2 - r,  x2, y2,
+               x2 - r, y2,  x1 + r, y2,
+               x1,     y2,  x1,     y2 - r,
+               x1,     y1 + r,  x1, y1]
+        return self.create_polygon(pts, smooth=True, **kw)
 
-        if img_path:
-            threading.Thread(
-                target=self._load_img_path, args=(img_path, img_size), daemon=True
-            ).start()
-        elif img_url:
-            threading.Thread(
-                target=self._load_img, args=(img_url, img_size), daemon=True
-            ).start()
+    def _draw(self):
+        try:
+            self.delete("all")
+        except tk.TclError:
+            return
+        bg  = CARD_H if self._hovered else CARD
+        bdr = ACCENT  if self._hovered else BORDER
+        lw  = 2 if self._hovered else 1
+        cw, ch = self._cw, self._ch
 
-    def _load_img(self, url: str, size: tuple):
-        img = load_image(url, size)
+        self._poly_round_rect(1, 1, cw - 1, ch - 1, self._RADIUS,
+                              fill=bg, outline=bdr, width=lw)
+
+        img_cy = int(ch * 0.42)
+        if self._tk_img:
+            self.create_image(cw // 2, img_cy, image=self._tk_img, anchor="center")
+        else:
+            self.create_text(cw // 2, img_cy, text="·",
+                             font=("Segoe UI", 14), fill=MUTED)
+
+        label = self._name if len(self._name) <= 18 else self._name[:16] + "…"
+        self.create_text(cw // 2, ch - 14, text=label,
+                         font=("Segoe UI", 8), fill=TEXT,
+                         anchor="center", width=cw - 12)
+
+        # Chargement image (une seule fois)
+        if not self._loading:
+            self._loading = True
+            if self._img_path:
+                threading.Thread(target=self._do_load_path, daemon=True).start()
+            elif self._img_url:
+                threading.Thread(target=self._do_load_url, daemon=True).start()
+
+    def _do_load_path(self):
+        img = load_image_from_path(self._img_path, self._isize)
         if img:
-            self._img_lbl.after(0, self.set_image, img)
+            self._tk_img = img
+            try:
+                self.after(0, self._draw)
+            except Exception:
+                pass
 
-    def _load_img_path(self, path: str, size: tuple):
-        img = load_image_from_path(path, size)
+    def _do_load_url(self):
+        img = load_image(self._img_url, self._isize)
         if img:
-            self._img_lbl.after(0, self.set_image, img)
+            self._tk_img = img
+            try:
+                self.after(0, self._draw)
+            except Exception:
+                pass
 
-    def _hover(self, on: bool):
-        c = CARD_H if on else CARD
-        for w in (self, self._img_lbl, self._name):
-            w.config(bg=c)
-
-    def set_image(self, tk_img: ImageTk.PhotoImage):
-        self._img_lbl.config(image=tk_img, text="", bg=CARD)
-        self._img_lbl.image = tk_img
+    def _on_hover(self, on: bool):
+        self._hovered = on
+        try:
+            self._draw()
+        except Exception:
+            pass
 
 
 class CategoryCard(tk.Frame):
