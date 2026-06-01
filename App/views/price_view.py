@@ -112,9 +112,18 @@ class PriceViewMixin:
         base_name = self.sel_skin.get("name", "")
         cat_label = self.cat_var.get()
         cat = CATEGORY_MAP[cat_label]
-        # Le market_hash_name doit inclure le préfixe StatTrak™ / Souvenir
-        if cat == 2 and not base_name.startswith("StatTrak\u2122"):
-            prefixed = f"StatTrak\u2122 {base_name}"
+        # Construire le market_hash_name exact attendu par CSFloat.
+        # Couteaux/gants commencent par "★ " — StatTrak s'insère après le ★.
+        # Exemples corrects :
+        #   Normal  : "★ Karambit | Fade (Factory New)"
+        #   StatTrak: "★ StatTrak™ Karambit | Fade (Factory New)"
+        #   Normal  : "AK-47 | Redline (Factory New)"
+        #   StatTrak: "StatTrak™ AK-47 | Redline (Factory New)"
+        if cat == 2 and "StatTrak\u2122" not in base_name:
+            if base_name.startswith("\u2605 "):
+                prefixed = f"\u2605 StatTrak\u2122 {base_name[2:]}"
+            else:
+                prefixed = f"StatTrak\u2122 {base_name}"
         elif cat == 3 and not base_name.startswith("Souvenir"):
             prefixed = f"Souvenir {base_name}"
         else:

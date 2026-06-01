@@ -253,14 +253,15 @@ class CSFloatApp(WeaponsViewMixin, SkinsViewMixin, PriceViewMixin,
                     seen.add(w)
 
         # Couteaux et Gants détectés dynamiquement
+        # Les gants ont aussi ★ — on teste GLOVES_KEYWORDS en priorité
         for weapon in sorted(grouped.keys()):
             if weapon in seen:
                 continue
-            if "★" in weapon or any(kw in weapon for kw in KNIFE_KEYWORDS):
-                cat_map["Couteaux"].append(weapon)
-                seen.add(weapon)
-            elif any(kw in weapon for kw in GLOVES_KEYWORDS):
+            if any(kw in weapon for kw in GLOVES_KEYWORDS):
                 cat_map["Gants"].append(weapon)
+                seen.add(weapon)
+            elif "★" in weapon or any(kw in weapon for kw in KNIFE_KEYWORDS):
+                cat_map["Couteaux"].append(weapon)
                 seen.add(weapon)
 
         self.skins_db             = data
