@@ -164,6 +164,51 @@ def analyze_prices(listings: list[dict]) -> dict:
     }
 
 
+_STEAM_MARKET_URL = "https://steamcommunity.com/market/priceoverview/"
+_STEAM_HEADERS    = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+
+
+def fetch_steam_market_price(market_hash_name: str) -> int | None:
+    """
+    Récupère le prix Steam Market le plus bas (USD cents) pour un skin CS2.
+    Utilise currency=1 (USD). Retourne None si indisponible.
+    """
+    import re as _re
+    for attempt in range(3):
+        try:
+            r = requests.get(
+                _STEAM_MARKET_URL,
+                headers=_STEAM_HEADERS,
+                params={"appid": 730, "currency": 1,
+                        "market_hash_name": market_hash_name},
+                timeout=12,
+            )
+            if r.status_code == 429:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            if not r.ok:
+                return None
+            data = r.json()
+            if not data.get("success"):
+                # Steam retourne parfois success:false temporairement
+                if attempt < 2:
+                    time.sleep(1.0)
+                    continue
+                return None
+            raw = data.get("lowest_price") or data.get("median_price") or ""
+            if not raw:
+                return None
+            cleaned = _re.sub(r"[^\d.,]", "", raw).replace(",", ".")
+            parts = cleaned.split(".")
+            if len(parts) > 2:
+                cleaned = "".join(parts[:-1]) + "." + parts[-1]
+            return int(round(float(cleaned) * 100))
+        except Exception:
+            if attempt < 2:
+                time.sleep(0.5)
+    return None
+
+
 def fetch_eur_rate() -> float:
     try:
         r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=8)

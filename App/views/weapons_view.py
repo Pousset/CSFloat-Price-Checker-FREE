@@ -45,13 +45,42 @@ class WeaponsViewMixin:
         for col in range(COLS):
             grid_frame.columnconfigure(col, weight=1)
 
-        # Séparateur
-        sep = tk.Frame(outer, bg=BG, padx=24, pady=8)
-        sep.pack(fill="x")
-        tk.Frame(sep, bg=BORDER, height=1).pack(fill="x")
+        # ── Bloc inventaire inline ────────────────────────────────────────────
+        tk.Frame(outer, bg=BORDER, height=1).pack(fill="x", padx=16, pady=(12, 0))
 
-        # Inventaire inline
-        self._build_inline_inventory(outer)
+        inv_frame = tk.Frame(outer, bg=BG2, padx=20, pady=14)
+        inv_frame.pack(fill="x", padx=16, pady=(0, 12))
+
+        tk.Label(inv_frame, text="🎒  Inventaire Steam",
+                 font=FONT_HEAD, bg=BG2, fg=TEXT).pack(anchor="w", pady=(0, 8))
+
+        row = tk.Frame(inv_frame, bg=BG2)
+        row.pack(fill="x")
+
+        if not hasattr(self, "_inv_steam_var"):
+            self._inv_steam_var = tk.StringVar()
+
+        entry = tk.Entry(row, textvariable=self._inv_steam_var,
+                         bg=BG3, fg=TEXT, insertbackground=ACCENT,
+                         font=FONT_BODY, bd=0, width=54,
+                         highlightthickness=1, highlightbackground=BORDER)
+        entry.pack(side="left", ipady=6, padx=(0, 10))
+        self._attach_paste_menu(entry)
+
+        btn = tk.Label(row, text="  Charger  ", bg=ACCENT, fg=BG,
+                       font=FONT_SMALL, cursor="hand2", padx=8, pady=6)
+        btn.pack(side="left")
+        btn.bind("<Button-1>", lambda e: self._goto_inventory_and_fetch())
+        entry.bind("<Return>",  lambda e: self._goto_inventory_and_fetch())
+
+        tk.Label(inv_frame,
+                 text="ex: 76561198xxxxxxxxx  ou  https://steamcommunity.com/profiles/76561198xxxxxxxxx",
+                 font=FONT_SMALL, bg=BG2, fg=MUTED).pack(anchor="w", pady=(6, 0))
+
+    def _goto_inventory_and_fetch(self):
+        """Navigue vers la page inventaire puis lance le fetch."""
+        self._show_inventory_page()
+        self._start_inventory_fetch()
 
     # ── Sélection d'une section → liste d'armes ───────────────────────────────
 

@@ -96,7 +96,8 @@ class SkinCard(tk.Canvas):
     _RADIUS = 12
 
     def __init__(self, parent, name: str, img_url: str = "", img_path: str = "",
-                 callback=None, card_w=148, card_h=130, img_size=(115, 80), **kw):
+                 callback=None, card_w=148, card_h=130, img_size=(115, 80),
+                 subtitle: str = "", **kw):
         try:
             bg_p = parent.cget("bg")
         except Exception:
@@ -104,16 +105,17 @@ class SkinCard(tk.Canvas):
         super().__init__(parent, width=card_w, height=card_h,
                          highlightthickness=0, bd=0, bg=bg_p,
                          cursor="hand2", **kw)
-        self._cw      = card_w
-        self._ch      = card_h
-        self._cb      = callback
-        self._name    = name
-        self._img_url = img_url
+        self._cw       = card_w
+        self._ch       = card_h
+        self._cb       = callback
+        self._name     = name
+        self._subtitle = subtitle
+        self._img_url  = img_url
         self._img_path = img_path
-        self._isize   = img_size
-        self._hovered = False
-        self._tk_img  = None
-        self._loading = False
+        self._isize    = img_size
+        self._hovered  = False
+        self._tk_img   = None
+        self._loading  = False
 
         self.bind("<Button-1>", lambda e: self._cb() if self._cb else None)
         self.bind("<Enter>",    lambda e: self._on_hover(True))
@@ -145,17 +147,26 @@ class SkinCard(tk.Canvas):
         self._poly_round_rect(1, 1, cw - 1, ch - 1, self._RADIUS,
                               fill=bg, outline=bdr, width=lw)
 
-        img_cy = int(ch * 0.42)
+        has_sub = bool(self._subtitle)
+        img_cy = int(ch * (0.38 if has_sub else 0.42))
         if self._tk_img:
             self.create_image(cw // 2, img_cy, image=self._tk_img, anchor="center")
         else:
             self.create_text(cw // 2, img_cy, text="·",
                              font=("Segoe UI", 14), fill=MUTED)
 
-        label = self._name if len(self._name) <= 18 else self._name[:16] + "…"
-        self.create_text(cw // 2, ch - 14, text=label,
-                         font=("Segoe UI", 8), fill=TEXT,
-                         anchor="center", width=cw - 12)
+        label = self._name if len(self._name) <= 20 else self._name[:18] + "…"
+        if has_sub:
+            self.create_text(cw // 2, ch - 22, text=label,
+                             font=("Segoe UI", 8), fill=TEXT,
+                             anchor="center", width=cw - 12)
+            self.create_text(cw // 2, ch - 9, text=self._subtitle,
+                             font=("Segoe UI", 8, "bold"), fill=ACCENT,
+                             anchor="center", width=cw - 12)
+        else:
+            self.create_text(cw // 2, ch - 14, text=label,
+                             font=("Segoe UI", 8), fill=TEXT,
+                             anchor="center", width=cw - 12)
 
         # Chargement image (une seule fois)
         if not self._loading:
@@ -195,7 +206,8 @@ class CategoryCard(tk.Frame):
     """Card de catégorie Frame-based avec effet hover ACCENT."""
 
     def __init__(self, parent, title: str, icon: str, count: int,
-                 callback, w: int = 210, h: int = 150, **kwargs):
+                 callback, w: int = 210, h: int = 150,
+                 subtitle: str = "", **kwargs):
         super().__init__(
             parent, bg=CARD, cursor="hand2",
             highlightbackground=BORDER, highlightthickness=1,
@@ -214,7 +226,8 @@ class CategoryCard(tk.Frame):
         self._title_lbl = tk.Label(inner, text=title,
                                     font=("Segoe UI", 11, "bold"), bg=CARD, fg=TEXT)
         self._title_lbl.pack(pady=(6, 0))
-        self._count_lbl = tk.Label(inner, text=f"{count} armes",
+        self._count_lbl = tk.Label(inner,
+                                    text=subtitle if subtitle else (f"{count} armes" if count >= 0 else ""),
                                     font=("Segoe UI", 9), bg=CARD, fg=MUTED)
         self._count_lbl.pack(pady=(2, 0))
 
