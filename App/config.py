@@ -23,18 +23,43 @@ WEAPON_ORDER = [
     "G3SG1", "SCAR-20", "MP7", "P2000", "Dual Berettas", "R8 Revolver",
 ]
 
-EXCLUDED_CATEGORIES = {
-    "Knife", "Gloves", "Agent", "Charm", "Sticker",
-    "Graffiti", "Music Kit", "Patch", "Container", "Key", "Pass",
+WEAPON_CATEGORIES = {
+    "Fusils": [
+        "AK-47", "AUG", "FAMAS", "Galil AR", "M4A1-S", "M4A4", "SG 553",
+        "AWP", "G3SG1", "SCAR-20", "SSG 08",
+    ],
+    "Pistolets": [
+        "Desert Eagle", "Dual Berettas", "Five-SeveN", "Glock-18",
+        "P2000", "P250", "R8 Revolver", "Tec-9", "USP-S", "CZ75-Auto",
+    ],
+    "Pistolets-Mitrailleurs": [
+        "MAC-10", "MP5-SD", "MP7", "MP9", "P90", "PP-Bizon", "UMP-45",
+    ],
+    "Lourd": [
+        "MAG-7", "Nova", "Sawed-Off", "XM1014", "M249", "Negev",
+    ],
+    # Couteaux et Gants sont détectés dynamiquement via KNIFE_KEYWORDS / GLOVES_KEYWORDS
 }
 
-EXCLUDED_WEAPONS = (
-    "Knife", "Bayonet", "Karambit", "Butterfly", "Bowie", "Falchion",
+SECTION_ORDER = [
+    "Fusils", "Pistolets", "Pistolets-Mitrailleurs",
+    "Lourd", "Couteaux", "Gants",
+]
+
+KNIFE_KEYWORDS = {
+    "Bayonet", "Karambit", "Butterfly", "Bowie", "Falchion",
     "Flip", "Gut", "Huntsman", "M9", "Navaja", "Shadow", "Stiletto",
     "Talon", "Ursus", "Classic", "Nomad", "Paracord", "Skeleton",
-    "Survival", "Gloves", "Hand Wraps", "Hydra", "Bloodhound", "Driver",
-    "Moto", "Specialist", "Sport", "★",
-)
+    "Survival",
+}
+GLOVES_KEYWORDS = {"Gloves", "Wraps"}
+
+EXCLUDED_CATEGORIES = {
+    "Charm", "Sticker", "Graffiti", "Music Kit",
+    "Patch", "Container", "Key", "Pass",
+}
+
+EXCLUDED_WEAPONS = ()
 
 EUR_RATE_DEFAULT = 0.92
 

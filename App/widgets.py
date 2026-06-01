@@ -36,6 +36,24 @@ def load_image(url: str, size: tuple = (80, 60)) -> ImageTk.PhotoImage | None:
         return None
 
 
+def load_image_from_path(path: str, size: tuple = (80, 60)) -> ImageTk.PhotoImage | None:
+    """Charge une image depuis un chemin JPEG local (cache disque), sans appel réseau."""
+    key = f"local:{path}_{size}"
+    if key in IMG_CACHE:
+        return IMG_CACHE[key]
+    try:
+        img = Image.open(path).convert("RGB")
+        img.thumbnail(size, Image.LANCZOS)
+        canvas = Image.new("RGB", size, (30, 34, 48))
+        offset = ((size[0] - img.width) // 2, (size[1] - img.height) // 2)
+        canvas.paste(img, offset)
+        tk_img = ImageTk.PhotoImage(canvas)
+        IMG_CACHE[key] = tk_img
+        return tk_img
+    except Exception:
+        return None
+
+
 class ScrollFrame(tk.Frame):
     def __init__(self, parent, **kw):
         super().__init__(parent, bg=BG, **kw)
@@ -59,8 +77,8 @@ class ScrollFrame(tk.Frame):
 
 
 class SkinCard(tk.Frame):
-    def __init__(self, parent, name: str, img_url: str, callback,
-                 card_w=120, card_h=110, img_size=(90, 68), **kw):
+    def __init__(self, parent, name: str, img_url: str = "", img_path: str = "",
+                 callback=None, card_w=120, card_h=110, img_size=(90, 68), **kw):
         super().__init__(parent, bg=CARD, width=card_w, height=card_h,
                          cursor="hand2", **kw)
         self.pack_propagate(False)
@@ -75,17 +93,26 @@ class SkinCard(tk.Frame):
         self._name.pack(pady=(0, 4))
 
         for w in (self, self._img_lbl, self._name):
-            w.bind("<Button-1>", lambda e: self._cb())
+            w.bind("<Button-1>", lambda e: self._cb() if self._cb else None)
             w.bind("<Enter>",    lambda e: self._hover(True))
             w.bind("<Leave>",    lambda e: self._hover(False))
 
-        if img_url:
+        if img_path:
+            threading.Thread(
+                target=self._load_img_path, args=(img_path, img_size), daemon=True
+            ).start()
+        elif img_url:
             threading.Thread(
                 target=self._load_img, args=(img_url, img_size), daemon=True
             ).start()
 
     def _load_img(self, url: str, size: tuple):
         img = load_image(url, size)
+        if img:
+            self._img_lbl.after(0, self.set_image, img)
+
+    def _load_img_path(self, path: str, size: tuple):
+        img = load_image_from_path(path, size)
         if img:
             self._img_lbl.after(0, self.set_image, img)
 

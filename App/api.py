@@ -132,10 +132,19 @@ def fetch_listings(api_key: str, market_hash_name: str,
         params["max_float"] = max_float
     resp = requests.get(
         f"{API_BASE}/listings",
-        headers={"Authorization": api_key},
+        headers={
+            "Authorization": api_key,
+            "Accept": "application/json",
+        },
         params=params,
         timeout=15,
     )
+    if resp.status_code == 403:
+        body = resp.text[:300].strip()
+        raise requests.HTTPError(
+            f"403 Forbidden — CSFloat a refusé la requête.\nRéponse : {body}",
+            response=resp,
+        )
     resp.raise_for_status()
     data = resp.json()
     return data if isinstance(data, list) else data.get("data", [])
