@@ -7,13 +7,13 @@ import tkinter as tk
 
 import requests
 
-from api import analyze_prices, fetch_listings
+from api import analyze_prices, fetch_listings, get_img_path_by_name
 from config import (
     ACCENT, ACCENT2, BG, BG2, BG3, BORDER, CARD, CARD_H,
     CATEGORY_MAP, FLOAT_RANGES, FONT_BODY, FONT_SMALL, FONT_STAT,
     GREEN, MUTED, RED, TEXT,
 )
-from widgets import ScrollFrame, load_image
+from widgets import ScrollFrame, load_image, load_image_from_path
 
 
 class PriceViewMixin:
@@ -40,11 +40,15 @@ class PriceViewMixin:
         info.pack(fill="both", expand=True)
 
         self._skin_big_lbl = tk.Label(info, bg=BG2, text="...", fg=MUTED,
-                                      font=("Consolas", 24))
+                                      font=("Segoe UI", 22))
         self._skin_big_lbl.pack(pady=(10, 8))
 
         def _load_big():
-            img = load_image(skin.get("image", ""), (220, 160))
+            img_path = get_img_path_by_name(skin.get("name", ""))
+            if img_path:
+                img = load_image_from_path(img_path, (220, 160))
+            else:
+                img = load_image(skin.get("image", ""), (220, 160))
             if img:
                 self._skin_big_lbl.after(0, lambda i=img: [
                     self._skin_big_lbl.config(image=i, text=""),
@@ -53,7 +57,7 @@ class PriceViewMixin:
         threading.Thread(target=_load_big, daemon=True).start()
 
         tk.Label(info, text=self.sel_weapon, font=FONT_SMALL, bg=BG2, fg=MUTED).pack()
-        tk.Label(info, text=skin_name, font=("Consolas", 13, "bold"),
+        tk.Label(info, text=skin_name, font=("Segoe UI", 12, "bold"),
                  bg=BG2, fg=ACCENT, wraplength=240).pack(pady=(2, 12))
 
         rarity = skin.get("rarity", {})
@@ -100,7 +104,7 @@ class PriceViewMixin:
             w.destroy()
         f = tk.Frame(self.results_right, bg=BG)
         f.place(relx=.5, rely=.5, anchor="center")
-        tk.Label(f, text="o", font=("Consolas", 40), bg=BG, fg=BORDER).pack()
+        tk.Label(f, text="◌", font=("Segoe UI", 36), bg=BG, fg=BORDER).pack()
         tk.Label(f, text="Choisis une qualite\npour voir les prix",
                  font=FONT_BODY, bg=BG, fg=MUTED, justify="center").pack(pady=8)
 
@@ -112,9 +116,18 @@ class PriceViewMixin:
         base_name = self.sel_skin.get("name", "")
         cat_label = self.cat_var.get()
         cat = CATEGORY_MAP[cat_label]
-        # Le market_hash_name doit inclure le préfixe StatTrak™ / Souvenir
-        if cat == 2 and not base_name.startswith("StatTrak\u2122"):
-            prefixed = f"StatTrak\u2122 {base_name}"
+        # Construire le market_hash_name exact attendu par CSFloat.
+        # Couteaux/gants commencent par "★ " — StatTrak s'insère après le ★.
+        # Exemples corrects :
+        #   Normal  : "★ Karambit | Fade (Factory New)"
+        #   StatTrak: "★ StatTrak™ Karambit | Fade (Factory New)"
+        #   Normal  : "AK-47 | Redline (Factory New)"
+        #   StatTrak: "StatTrak™ AK-47 | Redline (Factory New)"
+        if cat == 2 and "StatTrak\u2122" not in base_name:
+            if base_name.startswith("\u2605 "):
+                prefixed = f"\u2605 StatTrak\u2122 {base_name[2:]}"
+            else:
+                prefixed = f"StatTrak\u2122 {base_name}"
         elif cat == 3 and not base_name.startswith("Souvenir"):
             prefixed = f"Souvenir {base_name}"
         else:
@@ -151,7 +164,7 @@ class PriceViewMixin:
             w.destroy()
         f = tk.Frame(self.results_right, bg=BG)
         f.place(relx=.5, rely=.5, anchor="center")
-        tk.Label(f, text="chargement...", font=("Consolas", 32), bg=BG, fg=ACCENT).pack()
+        tk.Label(f, text="●", font=("Segoe UI", 32), bg=BG, fg=ACCENT).pack()
         tk.Label(f, text=f"Chargement...\n{name}",
                  font=FONT_BODY, bg=BG, fg=MUTED, justify="center").pack(pady=8)
 
@@ -160,7 +173,7 @@ class PriceViewMixin:
             w.destroy()
         f = tk.Frame(self.results_right, bg=BG)
         f.place(relx=.5, rely=.5, anchor="center")
-        tk.Label(f, text="X", font=("Consolas", 32), bg=BG, fg=RED).pack()
+        tk.Label(f, text="✕", font=("Segoe UI", 28), bg=BG, fg=RED).pack()
         tk.Label(f, text=msg, font=FONT_BODY, bg=BG,
                  fg=RED, wraplength=300, justify="center").pack(pady=8)
 
@@ -173,7 +186,7 @@ class PriceViewMixin:
         pad = tk.Frame(sf.inner, bg=BG, padx=20, pady=16)
         pad.pack(fill="both", expand=True)
 
-        tk.Label(pad, text=name, font=("Consolas", 12, "bold"),
+        tk.Label(pad, text=name, font=("Segoe UI", 11, "bold"),
                  bg=BG, fg=ACCENT, wraplength=500, justify="left").pack(anchor="w")
         tk.Frame(pad, bg=BORDER, height=1).pack(fill="x", pady=(8, 14))
 

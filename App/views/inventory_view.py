@@ -8,43 +8,79 @@ import tkinter as tk
 
 from api import fetch_listings, fetch_steam_inventory
 from config import (
-    ACCENT, ACCENT2, BG, BG2, BG3, BORDER,
+    ACCENT, ACCENT2, BG, BG2, BG3, BORDER, CARD,
     FONT_BODY, FONT_HEAD, FONT_SMALL, GREEN, MUTED, RED, TEXT,
 )
-from widgets import ScrollFrame
+from widgets import ScrollFrame, SkinCard, grid_card_size
 
 
 class InventoryViewMixin:
-    def _show_inventory_screen(self):
-        self._update_breadcrumb()
-        frame = tk.Frame(self.main_area, bg=BG)
-        self._swap(frame)
-        tk.Label(frame, text="Inventaire Steam - Valeur estimee",
-                 font=FONT_HEAD, bg=BG, fg=MUTED, padx=20, pady=14).pack(anchor="w")
+    def _attach_paste_menu(self, entry: tk.Entry):
+        """Ajoute un menu contextuel couper/copier/coller sur un widget Entry."""
+        menu = tk.Menu(entry, tearoff=0, bg=BG2, fg=TEXT,
+                       activebackground=ACCENT, activeforeground=BG,
+                       bd=0, relief="flat")
+        menu.add_command(label="Couper",   command=lambda: entry.event_generate("<<Cut>>"))
+        menu.add_command(label="Copier",   command=lambda: entry.event_generate("<<Copy>>"))
+        menu.add_command(label="Coller",   command=lambda: entry.event_generate("<<Paste>>"))
+        menu.add_separator()
+        menu.add_command(label="Tout sélectionner",
+                         command=lambda: entry.select_range(0, "end"))
 
-        input_frame = tk.Frame(frame, bg=BG3, padx=16, pady=12)
-        input_frame.pack(fill="x", padx=20, pady=(0, 10))
+        def show_menu(e):
+            try:
+                menu.tk_popup(e.x_root, e.y_root)
+            finally:
+                menu.grab_release()
+
+        entry.bind("<Button-3>", show_menu)
+
+    def _show_inventory_page(self):
+        """Ouvre l'inventaire en page complète (comme les autres vues)."""
+        self._update_breadcrumb(section="Inventaire Steam")
+        outer = tk.Frame(self.main_area, bg=BG)
+        self._swap(outer)
+
+        tk.Label(outer, text="🎒  Inventaire Steam",
+                 font=FONT_HEAD, bg=BG, fg=TEXT, padx=24).pack(anchor="w", pady=(16, 8))
+
+        input_frame = tk.Frame(outer, bg=BG2, padx=20, pady=14)
+        input_frame.pack(fill="x", padx=16)
+
         tk.Label(input_frame, text="SteamID64 ou URL du profil :",
-                 font=FONT_SMALL, bg=BG3, fg=MUTED).pack(anchor="w", pady=(0, 6))
-        row = tk.Frame(input_frame, bg=BG3)
+                 font=FONT_SMALL, bg=BG2, fg=MUTED).pack(anchor="w", pady=(0, 6))
+        row = tk.Frame(input_frame, bg=BG2)
         row.pack(fill="x")
-        self._inv_steam_var = tk.StringVar()
-        tk.Entry(row, textvariable=self._inv_steam_var, bg=BG, fg=TEXT,
-                 insertbackground=ACCENT, font=FONT_BODY, bd=0, width=52,
-                 highlightthickness=1, highlightbackground=BORDER
-                 ).pack(side="left", ipady=4, padx=(0, 8))
+
+        if not hasattr(self, "_inv_steam_var"):
+            self._inv_steam_var = tk.StringVar()
+
+        entry = tk.Entry(row, textvariable=self._inv_steam_var, bg=BG3, fg=TEXT,
+                         insertbackground=ACCENT, font=FONT_BODY, bd=0, width=56,
+                         highlightthickness=1, highlightbackground=BORDER)
+        entry.pack(side="left", ipady=6, padx=(0, 10))
+        self._attach_paste_menu(entry)
+        entry.bind("<Return>", lambda e: self._start_inventory_fetch())
+
         btn = tk.Label(row, text="  Charger  ", bg=ACCENT, fg=BG,
-                       font=FONT_SMALL, cursor="hand2", padx=6, pady=4)
+                       font=FONT_SMALL, cursor="hand2", padx=8, pady=6)
         btn.pack(side="left")
         btn.bind("<Button-1>", lambda e: self._start_inventory_fetch())
+
         tk.Label(input_frame,
                  text="ex: 76561198xxxxxxxxx  ou  https://steamcommunity.com/profiles/76561198xxxxxxxxx",
-                 font=FONT_SMALL, bg=BG3, fg=MUTED).pack(anchor="w", pady=(6, 0))
+                 font=FONT_SMALL, bg=BG2, fg=MUTED).pack(anchor="w", pady=(8, 0))
 
-        self._inv_results = tk.Frame(frame, bg=BG)
-        self._inv_results.pack(fill="both", expand=True, padx=20, pady=10)
-        tk.Label(self._inv_results, text="Entrez un SteamID64 et cliquez sur Charger.",
+        # Zone de résultats (prend tout l'espace restant)
+        self._inv_results = tk.Frame(outer, bg=BG)
+        self._inv_results.pack(fill="both", expand=True, padx=16, pady=(12, 0))
+        tk.Label(self._inv_results,
+                 text="Entrez un SteamID64 et cliquez sur Charger.",
                  font=FONT_BODY, bg=BG, fg=MUTED).pack(pady=30)
+
+    # Ancienne méthode inline conservée pour compatibilité éventuelle
+    def _build_inline_inventory(self, parent):
+        self._show_inventory_page()
 
     def _parse_steam_id(self, raw):
         raw = raw.strip()
@@ -122,62 +158,98 @@ class InventoryViewMixin:
         total_cents = sum(price_map.get(i["name"]) or 0 for i in items)
         priced      = sum(1 for i in items if price_map.get(i["name"]))
 
+        # ── Barre récap ──────────────────────────────────────────────────────
         summary = tk.Frame(self._inv_results, bg=BG2, padx=16, pady=12)
         summary.pack(fill="x", pady=(0, 8))
         tk.Label(summary, text=f"{len(items)} skin(s)  ({priced} avec prix CSFloat)",
                  font=FONT_SMALL, bg=BG2, fg=MUTED).pack(side="left")
         tk.Label(summary, text=self.format_price(total_cents),
-                 font=("Consolas", 16, "bold"), bg=BG2, fg=ACCENT).pack(side="right")
-        tk.Label(summary, text="Valeur estimee : ",
+                 font=("Segoe UI", 15, "bold"), bg=BG2, fg=ACCENT).pack(side="right")
+        tk.Label(summary, text="Valeur estimée : ",
                  font=FONT_SMALL, bg=BG2, fg=MUTED).pack(side="right")
 
-        exp = tk.Label(self._inv_results, text="Exporter JSON", font=FONT_SMALL,
+        exp = tk.Label(self._inv_results, text="  Exporter JSON  ", font=FONT_SMALL,
                        bg=BG3, fg=TEXT, padx=10, pady=5, cursor="hand2")
-        exp.pack(anchor="w", pady=(0, 6))
+        exp.pack(anchor="w", pady=(0, 8))
         exp.bind("<Button-1>", lambda e: self._inv_export(items, price_map))
         exp.bind("<Enter>", lambda e: exp.config(bg=BORDER))
         exp.bind("<Leave>", lambda e: exp.config(bg=BG3))
 
-        sf = ScrollFrame(self._inv_results)
-        sf.pack(fill="both", expand=True)
-
-        hdr = tk.Frame(sf.inner, bg=BG3, padx=8, pady=4)
-        hdr.pack(fill="x", pady=(0, 2))
-        tk.Label(hdr, text="x", font=FONT_SMALL, bg=BG3, fg=MUTED, width=3).pack(side="left")
-        tk.Label(hdr, text="Skin", font=FONT_SMALL, bg=BG3, fg=MUTED,
-                 anchor="w").pack(side="left", fill="x", expand=True, padx=8)
-        tk.Label(hdr, text="Unitaire", font=FONT_SMALL, bg=BG3, fg=MUTED,
-                 width=14, anchor="e").pack(side="left")
-        tk.Label(hdr, text="Total", font=FONT_SMALL, bg=BG3, fg=MUTED,
-                 width=14, anchor="e").pack(side="left")
-
-        groups = {}
+        # ── Grouper par nom ──────────────────────────────────────────────────
+        groups: dict = {}
         for item in items:
             n = item["name"]
-            groups.setdefault(n, {"name": n, "count": 0})["count"] += 1
+            if n not in groups:
+                groups[n] = {"name": n, "count": 0,
+                              "icon_url": item.get("icon_url", "")}
+            groups[n]["count"] += 1
 
-        for idx, g in enumerate(
-            sorted(groups.values(),
-                   key=lambda x: (price_map.get(x["name"]) or 0) * x["count"],
-                   reverse=True)
-        ):
-            name  = g["name"]
-            count = g["count"]
-            price = price_map.get(name)
-            rb    = CARD if idx % 2 == 0 else BG2
-            row   = tk.Frame(sf.inner, bg=rb, padx=8, pady=7)
-            row.pack(fill="x", pady=1)
-            tk.Label(row, text=f"x{count}", font=FONT_SMALL, bg=rb,
-                     fg=ACCENT2, width=3, anchor="w").pack(side="left")
-            tk.Label(row, text=name, font=FONT_SMALL, bg=rb,
-                     fg=TEXT, anchor="w").pack(side="left", fill="x", expand=True, padx=8)
-            tk.Label(row, text=self.format_price(price) if price else "-",
-                     font=FONT_SMALL, bg=rb, fg=MUTED,
-                     width=14, anchor="e").pack(side="left")
-            tk.Label(row, text=self.format_price(price * count) if price else "-",
-                     font=("Consolas", 9, "bold"), bg=rb,
-                     fg=GREEN if price else MUTED,
-                     width=14, anchor="e").pack(side="left")
+        self._inv_groups    = sorted(groups.values(),
+                                     key=lambda x: (price_map.get(x["name"]) or 0) * x["count"],
+                                     reverse=True)
+        self._inv_price_map = price_map
+        self._inv_last_w    = 0
+
+        # ── ScrollFrame + grille responsive ─────────────────────────────────
+        sf = ScrollFrame(self._inv_results)
+        sf.pack(fill="both", expand=True)
+        self._inv_sf = sf
+
+        sf.canvas.bind("<Configure>", lambda e: self._inv_on_resize(e.width))
+        sf.canvas.after_idle(lambda: self._inv_render_cards(sf.canvas.winfo_width()))
+
+    def _inv_on_resize(self, width: int):
+        if abs(width - self._inv_last_w) >= 20:
+            self._inv_render_cards(width)
+
+    def _inv_render_cards(self, avail_w: int = 0):
+        if avail_w == 0:
+            avail_w = self._inv_sf.canvas.winfo_width()
+        self._inv_last_w = avail_w
+
+        for child in self._inv_sf.inner.winfo_children():
+            if getattr(child, "_is_inv_grid", False):
+                child.destroy()
+
+        groups = self._inv_groups
+        if not groups:
+            return
+
+        cols, card_w, card_h = grid_card_size(
+            len(groups), avail_w, pad=10, min_w=120, max_w=240)
+        # hauteur légèrement augmentée pour le subtitle prix
+        card_h = int(card_h * 1.10)
+        img_w  = int(card_w * 0.78)
+        img_h  = int(card_h * 0.52)
+
+        grid = tk.Frame(self._inv_sf.inner, bg=BG)
+        grid._is_inv_grid = True
+        grid.pack(fill="x", padx=5, pady=5)
+
+        for i, g in enumerate(groups):
+            name     = g["name"]
+            count    = g["count"]
+            icon_url = g["icon_url"]
+            price    = self._inv_price_map.get(name)
+
+            parts        = name.split(" | ")
+            display_name = parts[1] if len(parts) > 1 else name
+            if count > 1:
+                display_name = f"x{count} {display_name}"
+
+            subtitle = self.format_price(price) if price else "—"
+            img_url  = (f"https://community.akamai.steamstatic.com/economy/image/{icon_url}"
+                        if icon_url else "")
+
+            row, col = divmod(i, cols)
+            SkinCard(grid, name=display_name,
+                     img_url=img_url,
+                     subtitle=subtitle,
+                     card_w=card_w, card_h=card_h, img_size=(img_w, img_h),
+                     ).grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+
+        for c in range(cols):
+            grid.columnconfigure(c, weight=1)
 
     def _inv_export(self, items, price_map):
         path = filedialog.asksaveasfilename(defaultextension=".json",
