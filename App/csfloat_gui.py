@@ -321,12 +321,13 @@ class CSFloatApp(WeaponsViewMixin, SkinsViewMixin, PriceViewMixin,
             if r.status_code == 401:
                 self.after(0, self._set_status, "Cle invalide (401)", RED)
             elif r.status_code == 403:
-                # 403 sans market_hash_name = cle acceptee mais droits limites
                 os.environ["CSFLOAT_API_KEY"] = key
-                self.after(0, self._set_status, "Cle valide", GREEN)
+                self._save_env_key(key)
+                self.after(0, self._set_status, "Cle valide ✓  (.env mis à jour)", GREEN)
             elif r.status_code in (200, 400):
                 os.environ["CSFLOAT_API_KEY"] = key
-                self.after(0, self._set_status, "Cle valide", GREEN)
+                self._save_env_key(key)
+                self.after(0, self._set_status, "Cle valide ✓  (.env mis à jour)", GREEN)
             else:
                 self.after(0, self._set_status, f"Erreur {r.status_code}", RED)
         except requests.exceptions.SSLError:
@@ -337,6 +338,24 @@ class CSFloatApp(WeaponsViewMixin, SkinsViewMixin, PriceViewMixin,
             self.after(0, self._set_status, "Timeout (15s)", RED)
         except Exception as exc:
             self.after(0, self._set_status, f"Erreur: {exc}", RED)
+
+    def _save_env_key(self, key: str):
+        """Crée ou met à jour CSFLOAT_API_KEY dans le fichier .env à côté de csfloat_gui.py."""
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+        lines: list[str] = []
+        found = False
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            for i, line in enumerate(lines):
+                if line.startswith("CSFLOAT_API_KEY"):
+                    lines[i] = f"CSFLOAT_API_KEY={key}\n"
+                    found = True
+                    break
+        if not found:
+            lines.append(f"CSFLOAT_API_KEY={key}\n")
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
 
     # ── Devise ────────────────────────────────────────────────────────────────
 
