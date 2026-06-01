@@ -78,8 +78,18 @@ MUTED   = "#6b7280"
 BORDER  = "#2a2f3d"
 
 # ── Typographie ───────────────────────────────────────────────────────────────
-FONT_TITLE = ("Consolas", 18, "bold")
-FONT_HEAD  = ("Consolas", 11, "bold")
-FONT_BODY  = ("Consolas", 10)
-FONT_SMALL = ("Consolas", 9)
-FONT_STAT  = ("Consolas", 20, "bold")
+FONT_TITLE = ("Segoe UI", 18, "bold")
+FONT_HEAD  = ("Segoe UI", 11, "bold")
+FONT_BODY  = ("Segoe UI", 10)
+FONT_SMALL = ("Segoe UI", 9)
+FONT_STAT  = ("Segoe UI", 20, "bold")
+
+# ── Icônes catégories ─────────────────────────────────────────────────────────
+SECTION_ICONS: dict[str, str] = {
+    "Fusils":                  "🎯",
+    "Pistolets":               "🔫",
+    "Pistolets-Mitrailleurs":  "💨",
+    "Lourd":                   "💥",
+    "Couteaux":                "🗡",
+    "Gants":                   "🧤",
+}

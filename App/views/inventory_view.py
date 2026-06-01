@@ -15,15 +15,16 @@ from widgets import ScrollFrame
 
 
 class InventoryViewMixin:
-    def _show_inventory_screen(self):
-        self._update_breadcrumb()
-        frame = tk.Frame(self.main_area, bg=BG)
-        self._swap(frame)
-        tk.Label(frame, text="Inventaire Steam - Valeur estimee",
-                 font=FONT_HEAD, bg=BG, fg=MUTED, padx=20, pady=14).pack(anchor="w")
+    def _build_inline_inventory(self, parent):
+        """Inventaire intégré dans la home, sous les catégories."""
+        frame = tk.Frame(parent, bg=BG, padx=24, pady=14)
+        frame.pack(fill="both", expand=True)
+
+        tk.Label(frame, text="Inventaire Steam",
+                 font=FONT_HEAD, bg=BG, fg=TEXT).pack(anchor="w", pady=(0, 10))
 
         input_frame = tk.Frame(frame, bg=BG3, padx=16, pady=12)
-        input_frame.pack(fill="x", padx=20, pady=(0, 10))
+        input_frame.pack(fill="x")
         tk.Label(input_frame, text="SteamID64 ou URL du profil :",
                  font=FONT_SMALL, bg=BG3, fg=MUTED).pack(anchor="w", pady=(0, 6))
         row = tk.Frame(input_frame, bg=BG3)
@@ -42,9 +43,9 @@ class InventoryViewMixin:
                  font=FONT_SMALL, bg=BG3, fg=MUTED).pack(anchor="w", pady=(6, 0))
 
         self._inv_results = tk.Frame(frame, bg=BG)
-        self._inv_results.pack(fill="both", expand=True, padx=20, pady=10)
+        self._inv_results.pack(fill="both", expand=True, pady=(10, 0))
         tk.Label(self._inv_results, text="Entrez un SteamID64 et cliquez sur Charger.",
-                 font=FONT_BODY, bg=BG, fg=MUTED).pack(pady=30)
+                 font=FONT_BODY, bg=BG, fg=MUTED).pack(pady=20)
 
     def _parse_steam_id(self, raw):
         raw = raw.strip()
@@ -127,7 +128,7 @@ class InventoryViewMixin:
         tk.Label(summary, text=f"{len(items)} skin(s)  ({priced} avec prix CSFloat)",
                  font=FONT_SMALL, bg=BG2, fg=MUTED).pack(side="left")
         tk.Label(summary, text=self.format_price(total_cents),
-                 font=("Consolas", 16, "bold"), bg=BG2, fg=ACCENT).pack(side="right")
+                 font=("Segoe UI", 15, "bold"), bg=BG2, fg=ACCENT).pack(side="right")
         tk.Label(summary, text="Valeur estimee : ",
                  font=FONT_SMALL, bg=BG2, fg=MUTED).pack(side="right")
 
@@ -175,7 +176,7 @@ class InventoryViewMixin:
                      font=FONT_SMALL, bg=rb, fg=MUTED,
                      width=14, anchor="e").pack(side="left")
             tk.Label(row, text=self.format_price(price * count) if price else "-",
-                     font=("Consolas", 9, "bold"), bg=rb,
+                     font=("Segoe UI", 9, "bold"), bg=rb,
                      fg=GREEN if price else MUTED,
                      width=14, anchor="e").pack(side="left")
 

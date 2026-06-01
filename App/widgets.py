@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 
 from api import cache_img
 from config import (
-    BG, BG2, CARD, CARD_H, MUTED, TEXT,
+    ACCENT, BG, BG2, BORDER, CARD, CARD_H, MUTED, TEXT,
     FONT_SMALL,
 )
 
@@ -124,3 +124,56 @@ class SkinCard(tk.Frame):
     def set_image(self, tk_img: ImageTk.PhotoImage):
         self._img_lbl.config(image=tk_img, text="", bg=CARD)
         self._img_lbl.image = tk_img
+
+
+class CategoryCard(tk.Frame):
+    """Card de catégorie Frame-based avec effet hover ACCENT."""
+
+    def __init__(self, parent, title: str, icon: str, count: int,
+                 callback, w: int = 210, h: int = 150, **kwargs):
+        super().__init__(
+            parent, bg=CARD, cursor="hand2",
+            highlightbackground=BORDER, highlightthickness=1,
+            **kwargs,
+        )
+
+        self._cb = callback
+
+        # Contenu centré
+        inner = tk.Frame(self, bg=CARD)
+        inner.place(relx=0.5, rely=0.5, anchor="center")
+
+        self._icon_lbl = tk.Label(inner, text=icon,
+                                   font=("Segoe UI", 30), bg=CARD, fg=TEXT)
+        self._icon_lbl.pack()
+        self._title_lbl = tk.Label(inner, text=title,
+                                    font=("Segoe UI", 11, "bold"), bg=CARD, fg=TEXT)
+        self._title_lbl.pack(pady=(6, 0))
+        self._count_lbl = tk.Label(inner, text=f"{count} armes",
+                                    font=("Segoe UI", 9), bg=CARD, fg=MUTED)
+        self._count_lbl.pack(pady=(2, 0))
+
+        # Taille fixe
+        self.config(width=w, height=h)
+        self.pack_propagate(False)
+
+        # Bind hover sur tous les enfants
+        for widget in (self, inner, self._icon_lbl, self._title_lbl, self._count_lbl):
+            widget.bind("<Button-1>", lambda e: callback())
+            widget.bind("<Enter>",    lambda e: self._hover(True))
+            widget.bind("<Leave>",    lambda e: self._hover(False))
+
+    def _hover(self, on: bool):
+        bg  = CARD_H if on else CARD
+        fg  = ACCENT if on else TEXT
+        bdr = ACCENT if on else BORDER
+        self.config(bg=bg, highlightbackground=bdr,
+                    highlightthickness=2 if on else 1)
+        for child in self.winfo_children():
+            try:
+                child.config(bg=bg)
+            except Exception:
+                pass
+        self._icon_lbl.config(fg=fg)
+        self._title_lbl.config(fg=TEXT)
+        self._count_lbl.config(fg=MUTED)
