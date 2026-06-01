@@ -5,6 +5,7 @@ import tkinter as tk
 import requests
 from PIL import Image, ImageTk
 
+from api import cache_img
 from config import (
     BG, BG2, CARD, CARD_H, MUTED, TEXT,
     FONT_SMALL,
@@ -18,8 +19,12 @@ def load_image(url: str, size: tuple = (80, 60)) -> ImageTk.PhotoImage | None:
     if key in IMG_CACHE:
         return IMG_CACHE[key]
     try:
-        r = requests.get(url, timeout=8)
-        img = Image.open(io.BytesIO(r.content)).convert("RGBA")
+        path = cache_img(url)
+        if path:
+            img = Image.open(path).convert("RGBA")
+        else:
+            r = requests.get(url, timeout=8)
+            img = Image.open(io.BytesIO(r.content)).convert("RGBA")
         img.thumbnail(size, Image.LANCZOS)
         bg = Image.new("RGBA", size, (13, 15, 20, 0))
         offset = ((size[0] - img.width) // 2, (size[1] - img.height) // 2)

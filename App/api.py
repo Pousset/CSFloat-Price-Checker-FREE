@@ -1,14 +1,104 @@
+import hashlib
+import io
 import json
 import os
 import statistics
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+from PIL import Image
 
 from config import API_BASE, SKINS_API
 
 SKINS_CACHE_PATH = os.path.join(os.path.dirname(__file__), ".skins_cache.json")
 SKINS_CACHE_TTL  = 7 * 24 * 3600  # 7 jours
+
+IMG_CACHE_DIR   = os.path.join(os.path.dirname(__file__), ".img_cache")
+IMG_CACHE_INDEX = os.path.join(IMG_CACHE_DIR, "index.json")
+_IMG_BG         = (30, 34, 48)  # correspond à CARD "#1e2230"
+
+
+def get_img_cache_path(url: str) -> str:
+    """Retourne le chemin JPEG local pour une URL d'image."""
+    h = hashlib.md5(url.encode()).hexdigest()
+    return os.path.join(IMG_CACHE_DIR, f"{h}.jpg")
+
+
+def cache_img(url: str) -> str | None:
+    """
+    Retourne le chemin JPEG local de l'image.
+    Si absent du cache, la télécharge, la composite sur fond sombre et la sauvegarde.
+    """
+    path = get_img_cache_path(url)
+    if os.path.exists(path):
+        return path
+    try:
+        os.makedirs(IMG_CACHE_DIR, exist_ok=True)
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        src = Image.open(io.BytesIO(r.content)).convert("RGBA")
+        bg  = Image.new("RGB", src.size, _IMG_BG)
+        bg.paste(src, mask=src.split()[3])          # composite alpha sur fond sombre
+        bg.save(path, "JPEG", quality=85, optimize=True)
+        return path
+    except Exception:
+        return None
+
+
+def _write_img_index(skins: list[dict]) -> None:
+    """Écrit (ou recrée) index.json : name → filename.jpg pour tous les skins en cache."""
+    index = {}
+    for s in skins:
+        name = s.get("name") or s.get("market_hash_name", "")
+        url  = s.get("image", "")
+        if not name or not url:
+            continue
+        fname = os.path.basename(get_img_cache_path(url))
+        if os.path.exists(os.path.join(IMG_CACHE_DIR, fname)):
+            index[name] = fname
+    tmp = IMG_CACHE_INDEX + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, IMG_CACHE_INDEX)  # écriture atomique
+
+
+def get_img_path_by_name(name: str) -> str | None:
+    """Retourne le chemin JPEG local d'un skin à partir de son nom (via index.json)."""
+    if not os.path.exists(IMG_CACHE_INDEX):
+        return None
+    with open(IMG_CACHE_INDEX, "r", encoding="utf-8") as f:
+        index = json.load(f)
+    fname = index.get(name)
+    if not fname:
+        return None
+    path = os.path.join(IMG_CACHE_DIR, fname)
+    return path if os.path.exists(path) else None
+
+
+def prefetch_all_skin_images(
+    skins: list[dict],
+    max_workers: int = 8,
+    progress_cb=None,
+) -> None:
+    """
+    Pré-télécharge en parallèle toutes les images de skins manquantes dans le cache JPEG,
+    puis met à jour index.json (name → filename.jpg).
+    progress_cb(done: int, total: int) est appelé après chaque image si fourni.
+    """
+    urls = [
+        s["image"] for s in skins
+        if s.get("image") and not os.path.exists(get_img_cache_path(s["image"]))
+    ]
+    total = len(urls)
+    done  = 0
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(cache_img, u): u for u in urls}
+        for f in as_completed(futures):
+            done += 1
+            if progress_cb:
+                progress_cb(done, total)
+    _write_img_index(skins)
 
 
 def fetch_skins_db() -> list[dict]:
