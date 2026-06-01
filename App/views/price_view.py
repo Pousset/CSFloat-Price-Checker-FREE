@@ -7,13 +7,13 @@ import tkinter as tk
 
 import requests
 
-from api import analyze_prices, fetch_listings
+from api import analyze_prices, fetch_listings, get_img_path_by_name
 from config import (
     ACCENT, ACCENT2, BG, BG2, BG3, BORDER, CARD, CARD_H,
     CATEGORY_MAP, FLOAT_RANGES, FONT_BODY, FONT_SMALL, FONT_STAT,
     GREEN, MUTED, RED, TEXT,
 )
-from widgets import ScrollFrame, load_image
+from widgets import ScrollFrame, load_image, load_image_from_path
 
 
 class PriceViewMixin:
@@ -44,7 +44,11 @@ class PriceViewMixin:
         self._skin_big_lbl.pack(pady=(10, 8))
 
         def _load_big():
-            img = load_image(skin.get("image", ""), (220, 160))
+            img_path = get_img_path_by_name(skin.get("name", ""))
+            if img_path:
+                img = load_image_from_path(img_path, (220, 160))
+            else:
+                img = load_image(skin.get("image", ""), (220, 160))
             if img:
                 self._skin_big_lbl.after(0, lambda i=img: [
                     self._skin_big_lbl.config(image=i, text=""),
