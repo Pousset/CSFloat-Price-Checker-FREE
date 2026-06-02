@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title CSFloat Price Checker — Build EXE
 color 0A
 
@@ -14,7 +15,7 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
-echo  [1/3] Installation des dependances...
+echo  [1/4] Installation des dependances...
 python -m pip install requests python-dotenv pillow pyinstaller --quiet
 if errorlevel 1 (
     echo  [ERREUR] Echec pip install.
@@ -23,14 +24,34 @@ if errorlevel 1 (
 echo         OK
 echo.
 
-echo  [2/3] Nettoyage anciens builds...
+echo  [2/4] Nettoyage anciens builds...
 if exist "dist\CSFloat_Price_Checker.exe" del /f /q "dist\CSFloat_Price_Checker.exe"
 if exist "App\releases\build" rmdir /s /q "App\releases\build"
 if exist "App\releases\CSFloat_Price_Checker.spec" del /f /q "App\releases\CSFloat_Price_Checker.spec"
 echo         OK
 echo.
 
-echo  [3/3] Compilation (1-2 minutes)...
+echo  [3/4] Pre-cache images skins...
+python prefetch_images.py --workers 16
+if errorlevel 1 (
+    echo.
+    echo  [ERREUR] Echec du pre-cache images.
+    pause & exit /b 1
+)
+if not exist "App\.skins_cache.json" (
+    echo.
+    echo  [ERREUR] App\.skins_cache.json introuvable apres le pre-cache.
+    pause & exit /b 1
+)
+if not exist "App\.img_cache\index.json" (
+    echo.
+    echo  [ERREUR] App\.img_cache\index.json introuvable apres le pre-cache.
+    pause & exit /b 1
+)
+echo         OK
+echo.
+
+echo  [4/4] Compilation (1-2 minutes)...
 echo.
 
 python -m PyInstaller ^
@@ -49,6 +70,8 @@ python -m PyInstaller ^
     --hidden-import "tkinter.ttk" ^
     --hidden-import "tkinter.messagebox" ^
     --hidden-import "tkinter.filedialog" ^
+    --add-data "%CD%\App\.skins_cache.json;App" ^
+    --add-data "%CD%\App\.img_cache;App\.img_cache" ^
     App\csfloat_gui.py
 
 if errorlevel 1 (

@@ -3,6 +3,7 @@ import io
 import json
 import os
 import statistics
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -11,11 +12,23 @@ from PIL import Image
 
 from config import API_BASE, SKINS_API
 
-SKINS_CACHE_PATH = os.path.join(os.path.dirname(__file__), ".skins_cache.json")
+APP_DIR = os.path.dirname(__file__)
+IS_FROZEN = getattr(sys, "frozen", False)
+RESOURCE_DIR = os.path.join(sys._MEIPASS, "App") if IS_FROZEN else APP_DIR
+USER_DATA_DIR = (
+    os.path.join(os.getenv("LOCALAPPDATA") or os.path.expanduser("~"), "CSFloat Price Checker")
+    if IS_FROZEN
+    else APP_DIR
+)
+
+SKINS_CACHE_PATH = os.path.join(USER_DATA_DIR, ".skins_cache.json")
+BUNDLED_SKINS_CACHE_PATH = os.path.join(RESOURCE_DIR, ".skins_cache.json") if IS_FROZEN else ""
 SKINS_CACHE_TTL  = 7 * 24 * 3600  # 7 jours
 
-IMG_CACHE_DIR   = os.path.join(os.path.dirname(__file__), ".img_cache")
+IMG_CACHE_DIR   = os.path.join(USER_DATA_DIR, ".img_cache")
+BUNDLED_IMG_CACHE_DIR = os.path.join(RESOURCE_DIR, ".img_cache") if IS_FROZEN else ""
 IMG_CACHE_INDEX = os.path.join(IMG_CACHE_DIR, "index.json")
+BUNDLED_IMG_CACHE_INDEX = os.path.join(BUNDLED_IMG_CACHE_DIR, "index.json") if IS_FROZEN else ""
 _IMG_BG         = (30, 34, 48)  # correspond à CARD "#1e2230"
 
 
@@ -25,11 +38,22 @@ def get_img_cache_path(url: str) -> str:
     return os.path.join(IMG_CACHE_DIR, f"{h}.jpg")
 
 
+def _get_bundled_img_cache_path(url: str) -> str:
+    if not BUNDLED_IMG_CACHE_DIR:
+        return ""
+    h = hashlib.md5(url.encode()).hexdigest()
+    return os.path.join(BUNDLED_IMG_CACHE_DIR, f"{h}.jpg")
+
+
 def cache_img(url: str) -> str | None:
     """
     Retourne le chemin JPEG local de l'image.
     Si absent du cache, la télécharge, la composite sur fond sombre et la sauvegarde.
     """
+    bundled_path = _get_bundled_img_cache_path(url)
+    if os.path.exists(bundled_path):
+        return bundled_path
+
     path = get_img_cache_path(url)
     if os.path.exists(path):
         return path
@@ -57,6 +81,7 @@ def _write_img_index(skins: list[dict]) -> None:
         fname = os.path.basename(get_img_cache_path(url))
         if os.path.exists(os.path.join(IMG_CACHE_DIR, fname)):
             index[name] = fname
+    os.makedirs(IMG_CACHE_DIR, exist_ok=True)
     tmp = IMG_CACHE_INDEX + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=2)
@@ -65,15 +90,21 @@ def _write_img_index(skins: list[dict]) -> None:
 
 def get_img_path_by_name(name: str) -> str | None:
     """Retourne le chemin JPEG local d'un skin à partir de son nom (via index.json)."""
-    if not os.path.exists(IMG_CACHE_INDEX):
-        return None
-    with open(IMG_CACHE_INDEX, "r", encoding="utf-8") as f:
-        index = json.load(f)
-    fname = index.get(name)
-    if not fname:
-        return None
-    path = os.path.join(IMG_CACHE_DIR, fname)
-    return path if os.path.exists(path) else None
+    for index_path, cache_dir in (
+        (BUNDLED_IMG_CACHE_INDEX, BUNDLED_IMG_CACHE_DIR),
+        (IMG_CACHE_INDEX, IMG_CACHE_DIR),
+    ):
+        if not os.path.exists(index_path):
+            continue
+        with open(index_path, "r", encoding="utf-8") as f:
+            index = json.load(f)
+        fname = index.get(name)
+        if not fname:
+            continue
+        path = os.path.join(cache_dir, fname)
+        if os.path.exists(path):
+            return path
+    return None
 
 
 def prefetch_all_skin_images(
@@ -106,9 +137,13 @@ def fetch_skins_db() -> list[dict]:
         if time.time() - os.path.getmtime(SKINS_CACHE_PATH) < SKINS_CACHE_TTL:
             with open(SKINS_CACHE_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
+    if os.path.exists(BUNDLED_SKINS_CACHE_PATH):
+        with open(BUNDLED_SKINS_CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
     r = requests.get(SKINS_API, timeout=20)
     r.raise_for_status()
     data = r.json()
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
     with open(SKINS_CACHE_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f)
     return data

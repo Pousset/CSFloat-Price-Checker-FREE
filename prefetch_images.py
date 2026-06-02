@@ -29,8 +29,7 @@ def main():
     print(f"Dossier de cache : {IMG_CACHE_DIR}")
 
     if to_download == 0:
-        print("Tout est déjà en cache !")
-        return
+        print("Tout est déjà en cache, reconstruction de l'index...")
 
     def progress(done, total):
         pct  = done / total * 100
@@ -44,7 +43,7 @@ def main():
     import json as _json
     with open(IMG_CACHE_INDEX, encoding="utf-8") as f:
         index = _json.load(f)
-    print(f"index.json mis à jour : {len(index)} entrées → {IMG_CACHE_INDEX}")
+    print(f"index.json mis à jour : {len(index)} entrées -> {IMG_CACHE_INDEX}")
 
 
 if __name__ == "__main__":
