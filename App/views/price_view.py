@@ -13,6 +13,7 @@ from config import (
     CATEGORY_MAP, FLOAT_RANGES, FONT_BODY, FONT_SMALL, FONT_STAT,
     GREEN, MUTED, RED, TEXT,
 )
+from price_history import save_price_search
 from widgets import ScrollFrame, load_image, load_image_from_path
 
 
@@ -144,6 +145,19 @@ class PriceViewMixin:
             stats    = analyze_prices(listings)
             self.listings_cache = listings
             self.stats_cache    = stats
+            try:
+                save_price_search(
+                    name,
+                    listings,
+                    stats,
+                    min_float=min_f,
+                    max_float=max_f,
+                    category=cat,
+                    limit_requested=50,
+                    source="price_view",
+                )
+            except Exception:
+                pass
             self.after(0, self._show_price_results, name, listings, stats)
         except requests.HTTPError as e:
             code = e.response.status_code if e.response is not None else 0

@@ -6,11 +6,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tkinter import filedialog, messagebox
 import tkinter as tk
 
-from api import fetch_listings, fetch_steam_inventory
+from api import analyze_prices, fetch_listings, fetch_steam_inventory
 from config import (
     ACCENT, ACCENT2, BG, BG2, BG3, BORDER, CARD,
     FONT_BODY, FONT_HEAD, FONT_SMALL, GREEN, MUTED, RED, TEXT,
 )
+from price_history import save_price_search
 from widgets import ScrollFrame, SkinCard, grid_card_size
 
 
@@ -124,6 +125,16 @@ class InventoryViewMixin:
         def fetch_price(name):
             try:
                 listings = fetch_listings(api_key, name, limit=1)
+                try:
+                    save_price_search(
+                        name,
+                        listings,
+                        analyze_prices(listings),
+                        limit_requested=1,
+                        source="inventory_view",
+                    )
+                except Exception:
+                    pass
                 return name, listings[0]["price"] if listings else None
             except Exception:
                 return name, None
